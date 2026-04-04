@@ -1,29 +1,29 @@
 import { useState, useCallback, useRef } from 'react';
 
 const SOIL_TYPES = [
-  { id: 'sandy', label: 'Sandy — drains fast' },
-  { id: 'loamy', label: 'Loamy — balanced' },
-  { id: 'clay', label: 'Clay — retains water' },
+  { id: 'sandy', label: 'Sandy' },
+  { id: 'loamy', label: 'Loamy' },
+  { id: 'clay', label: 'Clay' },
 ];
 
 const GROWTH_STAGES = [
-  { id: 'seedling', label: 'Seedling — Low need' },
-  { id: 'vegetative', label: 'Vegetative — Moderate' },
-  { id: 'flowering', label: 'Flowering — High' },
-  { id: 'fruiting', label: 'Fruiting — Very high' },
+  { id: 'seedling', label: 'Seedling' },
+  { id: 'vegetative', label: 'Vegetative' },
+  { id: 'flowering', label: 'Flowering' },
+  { id: 'fruiting', label: 'Fruiting' },
 ];
 
 // Plant type IDs must match the training dataset Vietnamese labels exactly
 const PLANT_TYPES = [
-  { id: 'Rau muống', label: 'Water Spinach (Rau muống)' },
-  { id: 'Cải, xà lách', label: 'Lettuce / Cabbage (Cải, xà lách)' },
-  { id: 'Cà chua', label: 'Tomato (Cà chua)' },
-  { id: 'Dưa leo', label: 'Cucumber (Dưa leo)' },
-  { id: 'Chuối', label: 'Banana (Chuối)' },
-  { id: 'Xoài', label: 'Mango (Xoài)' },
-  { id: 'Thanh long', label: 'Dragon Fruit (Thanh long)' },
-  { id: 'Sầu riêng', label: 'Durian (Sầu riêng)' },
-  { id: 'Cam, bưởi', label: 'Citrus — Orange / Pomelo' },
+  { id: 'Rau muống', label: 'Water Spinach' },
+  { id: 'Cải, xà lách', label: 'Lettuce / Cabbage' },
+  { id: 'Cà chua', label: 'Tomato' },
+  { id: 'Dưa leo', label: 'Cucumber' },
+  { id: 'Chuối', label: 'Banana' },
+  { id: 'Xoài', label: 'Mango' },
+  { id: 'Thanh long', label: 'Dragon Fruit' },
+  { id: 'Sầu riêng', label: 'Durian' },
+  { id: 'Cam, bưởi', label: 'Citrus' },
 ];
 
 const DEFAULT_FORM = {
@@ -271,11 +271,11 @@ function PlantDiseaseDetectionTab() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!image) return;
-    
+
     setLoading(true);
     setError(null);
     setResult(null);
-    
+
     const formData = new FormData();
     formData.append('file', image);
 
@@ -303,7 +303,7 @@ function PlantDiseaseDetectionTab() {
         <div className="section-label">
           <span>📸 Upload Plant Image</span>
         </div>
-        
+
         <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
           {preview ? (
             <img src={preview} alt="Plant preview" className="image-preview" />
@@ -314,12 +314,12 @@ function PlantDiseaseDetectionTab() {
               <small>Supported formats: JPG, PNG, JPEG</small>
             </div>
           )}
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleImageChange} 
-            accept="image/jpeg, image/png, image/jpg" 
-            hidden 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+            accept="image/jpeg, image/png, image/jpg"
+            hidden
           />
         </div>
 
@@ -340,16 +340,15 @@ function PlantDiseaseDetectionTab() {
         <div className="pred-result-card disease-result">
           <div className="result-title">Analysis Result</div>
           <div className="disease-details">
-             <div className="disease-name">
-               <span className="icon">🦠</span>
-               <h3>{result.disease}</h3>
-             </div>
-             <div className="disease-confidence">
-               <div className="conf-bar">
-                 <div className="conf-fill" style={{ width: `${result.confidence}%`, background: result.confidence > 80 ? 'var(--green)' : '#e3a008' }}></div>
-               </div>
-               <span>{result.confidence.toFixed(1)}% Confidence</span>
-             </div>
+            <div className="disease-name">
+              <h3>{result.disease}</h3>
+            </div>
+            <div className="disease-confidence">
+              <div className="conf-bar">
+                <div className="conf-fill" style={{ width: `${result.confidence}%`, background: result.confidence > 80 ? 'var(--green)' : '#e3a008' }}></div>
+              </div>
+              <span>{result.confidence.toFixed(1)}% Confidence</span>
+            </div>
           </div>
         </div>
       )}
@@ -377,13 +376,13 @@ export default function WateringPrediction() {
 
       {/* Toggle */}
       <div className="pred-toggle">
-        <button 
+        <button
           className={`toggle-btn ${activeModel === 'watering' ? 'active' : ''}`}
           onClick={() => setActiveModel('watering')}
         >
           💧 Smart Watering
         </button>
-        <button 
+        <button
           className={`toggle-btn ${activeModel === 'disease' ? 'active' : ''}`}
           onClick={() => setActiveModel('disease')}
         >
@@ -398,7 +397,7 @@ export default function WateringPrediction() {
       <style dangerouslySetInnerHTML={{
         __html: `
         /* ── Page layout ── */
-        .pred-page { display: flex; flex-direction: column; gap: 20px; max-width: 960px; animation: fadeIn .4s ease; }
+        .pred-page { display: flex; flex-direction: column; gap: 20px; max-width: 1000px; margin: 0 auto; animation: fadeIn .4s ease; }
 
         /* ── Header ── */
         .pred-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }

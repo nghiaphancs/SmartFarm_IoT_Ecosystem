@@ -3,7 +3,7 @@ import { useSmartFarm } from './hooks/useSmartFarm';
 import SensorCard from './components/SensorCard';
 import SensorChart from './components/SensorChart';
 import ControlPanel from './components/ControlPanel';
-import AlertPanel from './components/AlertPanel';
+
 import WateringPrediction from './pages/WateringPrediction';
 
 const NAV = [
@@ -57,7 +57,7 @@ export default function App() {
           <div className="dashboard-layout">
             <section className="dashboard-top">
               <div className="grid-4">
-                <SensorCard type="temp" label="Temperature" value={sensors.temperature} unit="°C" icon="🌡️" />
+                <SensorCard type="temp" label="Temperature" value={sensors.temperature} unit="°C" icon="🌡️" isAlert={sensors.temperature > 35} />
                 <SensorCard type="humidity" label="Air Humidity" value={sensors.humidity} unit="%" icon="💧" />
                 <SensorCard type="soil" label="Soil Moisture" value={sensors.soil} unit="%" icon="🌱" />
                 <SensorCard type="lux" label="Light" value={sensors.lux} unit="lux" icon="☀️" />
@@ -78,13 +78,10 @@ export default function App() {
       case 'control':
         return (
           <div className="control-page-layout">
-            <div className="bottom-grid-2">
-              <ControlPanel devices={devices} control={control} />
-              <AlertPanel alerts={alerts} />
-            </div>
+            <ControlPanel devices={devices} control={control} />
             <style dangerouslySetInnerHTML={{
               __html: `
-              .control-page-layout { max-width: 900px; animation: fadeIn 0.4s ease; }
+              .control-page-layout { max-width: 800px; margin: 0 auto; animation: fadeIn 0.4s ease; }
             `}} />
           </div>
         );

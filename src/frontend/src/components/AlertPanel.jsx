@@ -6,7 +6,7 @@ export default function AlertPanel({ alerts }) {
         {alerts.length === 0 ? (
           <div className="alert-empty-mini">No active alerts.</div>
         ) : (
-          [...alerts].reverse().slice(0, 3).map((a, i) => (
+          [...alerts].reverse().map((a, i) => (
             <div key={i} className="alert-item-mini">
               <div className="alert-item-icon">🌡️</div>
               <div className="alert-item-text">

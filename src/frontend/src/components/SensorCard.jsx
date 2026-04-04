@@ -1,13 +1,16 @@
-export default function SensorCard({ type, label, value, unit, icon }) {
+export default function SensorCard({ type, label, value, unit, icon, isAlert }) {
   const fmt = value !== null && value !== undefined
     ? parseFloat(value).toFixed(1)
     : '—';
 
   return (
-    <div className={`sensor-card ${type}`}>
+    <div className={`sensor-card ${type} ${isAlert ? 'alerting' : ''}`}>
       <div className="card-header">
         <div className={`card-icon ${type}`}>{icon}</div>
-        <span className="card-label">{label}</span>
+        <span className="card-label">
+          {label}
+          {isAlert && <span className="alert-badge">ALERT!</span>}
+        </span>
       </div>
       <div className={`card-value ${type}`}>
         {fmt}
