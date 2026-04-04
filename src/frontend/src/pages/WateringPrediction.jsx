@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 const SOIL_TYPES = [
   { id: 'sandy', label: 'Sandy — drains fast' },
@@ -66,7 +66,7 @@ function WaterGauge({ ml }) {
   );
 }
 
-export default function WateringPrediction() {
+function WateringPredictionTab() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -95,7 +95,7 @@ export default function WateringPrediction() {
     try {
       const res = await fetch('http://localhost:8000/api/sensors-for-predict');
       const data = await res.json();
-      
+
       // Get Location & Fetch 24h rainfall from Open-Meteo
       let autoRainfall = null;
 
@@ -130,11 +130,11 @@ export default function WateringPrediction() {
 
       setForm(prev => ({
         ...prev,
-        temperature:   data.temperature !== null   ? Math.round(data.temperature * 10) / 10 : prev.temperature,
-        air_humidity:  data.air_humidity !== null  ? Math.round(data.air_humidity * 10) / 10 : prev.air_humidity,
+        temperature: data.temperature !== null ? Math.round(data.temperature * 10) / 10 : prev.temperature,
+        air_humidity: data.air_humidity !== null ? Math.round(data.air_humidity * 10) / 10 : prev.air_humidity,
         soil_moisture: data.soil_moisture !== null ? Math.round(data.soil_moisture * 10) / 10 : prev.soil_moisture,
-        light:         data.light !== null         ? Math.round(data.light / 100) * 100 : prev.light,
-        rainfall:      autoRainfall !== null       ? autoRainfall : prev.rainfall,
+        light: data.light !== null ? Math.round(data.light / 100) * 100 : prev.light,
+        rainfall: autoRainfall !== null ? autoRainfall : prev.rainfall,
       }));
       setPrediction(null);
     } catch {
@@ -168,104 +168,231 @@ export default function WateringPrediction() {
   };
 
   return (
-    <div className="pred-page">
+    <>
+      <form className="pred-card" onSubmit={handleSubmit}>
+        <div className="section-label">
+          <span>🌡️ Environmental Conditions</span>
+          <button type="button" className="autofill-btn" onClick={handleAutoFill} disabled={autofilling}>
+            {autofilling ? '⏳ Fetching…' : '📡 Auto-fill from Sensors'}
+          </button>
+        </div>
 
+        <div className="form-grid">
+          <label className="field">
+            <span>Temperature (°C)</span>
+            <input type="number" name="temperature" value={form.temperature} min={10} max={50} step={0.1} onChange={handleChange} />
+          </label>
+          <label className="field">
+            <span>Air Humidity (%)</span>
+            <input type="number" name="air_humidity" value={form.air_humidity} min={0} max={100} step={0.1} onChange={handleChange} />
+          </label>
+          <label className="field">
+            <span>Soil Moisture (%)</span>
+            <input type="number" name="soil_moisture" value={form.soil_moisture} min={0} max={100} step={0.1} onChange={handleChange} />
+          </label>
+          <label className="field">
+            <span>Light Intensity (lux)</span>
+            <input type="number" name="light" value={form.light} min={0} max={120000} step={100} onChange={handleChange} onBlur={handleBlur} />
+          </label>
+          <label className="field">
+            <span>Rainfall last 24h (mm)</span>
+            <input type="number" name="rainfall" value={form.rainfall} min={0} max={200} step={0.1} onChange={handleChange} />
+          </label>
+        </div>
+
+        <div className="section-label" style={{ marginTop: 8 }}>
+          <span>🌱 Plant Characteristics</span>
+        </div>
+
+        <div className="form-grid">
+          <label className="field">
+            <span>Soil Type</span>
+            <select name="soil_type" value={form.soil_type} onChange={handleChange}>
+              {SOIL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Growth Stage</span>
+            <select name="growth_stage" value={form.growth_stage} onChange={handleChange}>
+              {GROWTH_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            <span>Plant Type</span>
+            <select name="plant_type" value={form.plant_type} onChange={handleChange}>
+              {PLANT_TYPES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {error && <div className="pred-error">⚠️ {error}</div>}
+
+        <button className="pred-submit" type="submit" disabled={loading}>
+          {loading ? <span className="spin">⏳</span> : '💧 Predict Water Amount'}
+        </button>
+      </form>
+
+      {prediction !== null && (
+        <div className="pred-result-card" key={prediction}>
+          <div className="result-title">Recommended Water Amount</div>
+          <WaterGauge ml={prediction} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function PlantDiseaseDetectionTab() {
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(file);
+      setPreview(URL.createObjectURL(file));
+      setResult(null);
+      setError(null);
+    }
+  };
+
+  const handleClear = () => {
+    setImage(null);
+    setPreview(null);
+    setResult(null);
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!image) return;
+    
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    
+    const formData = new FormData();
+    formData.append('file', image);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/predict-disease', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail ?? 'Prediction failed');
+      }
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <form className="pred-card disease-card" onSubmit={handleSubmit}>
+        <div className="section-label">
+          <span>📸 Upload Plant Image</span>
+        </div>
+        
+        <div className="upload-area" onClick={() => fileInputRef.current?.click()}>
+          {preview ? (
+            <img src={preview} alt="Plant preview" className="image-preview" />
+          ) : (
+            <div className="upload-placeholder">
+              <span className="upload-icon">🍃</span>
+              <p>Click to select an image</p>
+              <small>Supported formats: JPG, PNG, JPEG</small>
+            </div>
+          )}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImageChange} 
+            accept="image/jpeg, image/png, image/jpg" 
+            hidden 
+          />
+        </div>
+
+        {preview && (
+          <div className="disease-actions">
+            <button type="button" className="clear-btn" onClick={(e) => { e.stopPropagation(); handleClear(); }}>Clear Image</button>
+          </div>
+        )}
+
+        {error && <div className="pred-error">⚠️ {error}</div>}
+
+        <button className="pred-submit disease-submit" type="submit" disabled={!image || loading}>
+          {loading ? <span className="spin">⏳</span> : '🔍 Analyze Image'}
+        </button>
+      </form>
+
+      {result && (
+        <div className="pred-result-card disease-result">
+          <div className="result-title">Analysis Result</div>
+          <div className="disease-details">
+             <div className="disease-name">
+               <span className="icon">🦠</span>
+               <h3>{result.disease}</h3>
+             </div>
+             <div className="disease-confidence">
+               <div className="conf-bar">
+                 <div className="conf-fill" style={{ width: `${result.confidence}%`, background: result.confidence > 80 ? 'var(--green)' : '#e3a008' }}></div>
+               </div>
+               <span>{result.confidence.toFixed(1)}% Confidence</span>
+             </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default function WateringPrediction() {
+  const [activeModel, setActiveModel] = useState('watering');
+
+  return (
+    <div className="pred-page">
       {/* Header */}
       <div className="pred-header">
         <div>
-          <h2 className="pred-title">🧠 Smart Watering Prediction</h2>
-          <p className="pred-sub">ML model predicts optimal irrigation volume based on environment &amp; plant data.</p>
+          <h2 className="pred-title">🧠 AI Predictions</h2>
+          <p className="pred-sub">Leverage Machine Learning to optimize your farming</p>
         </div>
         <div className="pred-badge">
           <span>⚡ Powered by</span>
           <span className="badge-sep">|</span>
-          <span>XGBoost</span>
+          <span>XGBoost &amp; CNN</span>
         </div>
       </div>
 
+      {/* Toggle */}
+      <div className="pred-toggle">
+        <button 
+          className={`toggle-btn ${activeModel === 'watering' ? 'active' : ''}`}
+          onClick={() => setActiveModel('watering')}
+        >
+          💧 Smart Watering
+        </button>
+        <button 
+          className={`toggle-btn ${activeModel === 'disease' ? 'active' : ''}`}
+          onClick={() => setActiveModel('disease')}
+        >
+          🍃 Disease Detection
+        </button>
+      </div>
+
       <div className="pred-body">
-        {/* Form card */}
-        <form className="pred-card" onSubmit={handleSubmit}>
-          {/* Section: Environment */}
-          <div className="section-label">
-            <span>🌡️ Environmental Conditions</span>
-            <button type="button" className="autofill-btn" onClick={handleAutoFill} disabled={autofilling}>
-              {autofilling ? '⏳ Fetching…' : '📡 Auto-fill from Sensors'}
-            </button>
-          </div>
-
-          <div className="form-grid">
-            <label className="field">
-              <span>Temperature (°C)</span>
-              <input type="number" name="temperature" value={form.temperature} min={10} max={50} step={0.1} onChange={handleChange} />
-            </label>
-            <label className="field">
-              <span>Air Humidity (%)</span>
-              <input type="number" name="air_humidity" value={form.air_humidity} min={0} max={100} step={0.1} onChange={handleChange} />
-            </label>
-            <label className="field">
-              <span>Soil Moisture (%)</span>
-              <input type="number" name="soil_moisture" value={form.soil_moisture} min={0} max={100} step={0.1} onChange={handleChange} />
-            </label>
-            <label className="field">
-              <span>Light Intensity (lux)</span>
-              <input 
-                type="number" 
-                name="light" 
-                value={form.light} 
-                min={0} 
-                max={120000} 
-                step={100} 
-                onChange={handleChange} 
-                onBlur={handleBlur}
-              />
-            </label>
-            <label className="field">
-              <span>Rainfall last 24h (mm)</span>
-              <input type="number" name="rainfall" value={form.rainfall} min={0} max={200} step={0.1} onChange={handleChange} />
-            </label>
-          </div>
-
-          {/* Section: Plant info */}
-          <div className="section-label" style={{ marginTop: 8 }}>
-            <span>🌱 Plant Characteristics</span>
-          </div>
-
-          <div className="form-grid">
-            <label className="field">
-              <span>Soil Type</span>
-              <select name="soil_type" value={form.soil_type} onChange={handleChange}>
-                {SOIL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>Growth Stage</span>
-              <select name="growth_stage" value={form.growth_stage} onChange={handleChange}>
-                {GROWTH_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>Plant Type</span>
-              <select name="plant_type" value={form.plant_type} onChange={handleChange}>
-                {PLANT_TYPES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
-            </label>
-          </div>
-
-          {error && <div className="pred-error">⚠️ {error}</div>}
-
-          <button className="pred-submit" type="submit" disabled={loading}>
-            {loading ? <span className="spin">⏳</span> : '💧 Predict Water Amount'}
-          </button>
-        </form>
-
-        {/* Result card */}
-        {prediction !== null && (
-          <div className="pred-result-card" key={prediction}>
-            <div className="result-title">Recommended Water Amount</div>
-            <WaterGauge ml={prediction} />
-          </div>
-        )}
+        {activeModel === 'watering' ? <WateringPredictionTab /> : <PlantDiseaseDetectionTab />}
       </div>
 
       <style dangerouslySetInnerHTML={{
@@ -283,6 +410,21 @@ export default function WateringPrediction() {
           padding: 6px 14px; color: var(--green); white-space: nowrap; height: fit-content;
         }
         .badge-sep { opacity: .4; }
+
+        /* ── Toggle ── */
+        .pred-toggle {
+          display: flex; background: var(--bg-card); border-radius: 12px; padding: 6px; gap: 8px;
+          border: 1px solid var(--border); width: fit-content; margin-bottom: 4px;
+        }
+        .toggle-btn {
+          background: transparent; border: none; padding: 10px 20px; font-size: 14px; font-weight: 600;
+          color: var(--text-secondary); border-radius: 8px; cursor: pointer; transition: all .3s ease;
+          font-family: inherit;
+        }
+        .toggle-btn:hover { color: var(--text-primary); }
+        .toggle-btn.active {
+          background: var(--bg-card-hover); color: var(--green); box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
 
         /* ── Body ── */
         .pred-body { display: flex; flex-direction: column; gap: 20px; }
@@ -342,6 +484,10 @@ export default function WateringPrediction() {
         }
         .pred-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px var(--green-dim); filter: brightness(1.1); }
         .pred-submit:disabled { opacity: .55; cursor: not-allowed; }
+        
+        .disease-submit { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+        .disease-submit:hover:not(:disabled) { box-shadow: 0 6px 16px rgba(14,165,233,0.3); }
+        
         .spin { animation: spin 1s linear infinite; display: inline-block; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -352,6 +498,8 @@ export default function WateringPrediction() {
           box-shadow: 0 0 24px var(--green-dim);
           animation: slideUp .5s cubic-bezier(.16,1,.3,1);
         }
+        .disease-result { border-color: #0ea5e9; box-shadow: 0 0 24px rgba(14,165,233,0.15); }
+        
         @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
         .result-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--text-secondary); margin-bottom: 20px; }
 
@@ -370,6 +518,36 @@ export default function WateringPrediction() {
           transition: width 1s cubic-bezier(.16,1,.3,1);
         }
         .gauge-advice { font-size: 14px; color: var(--text-secondary); margin: 0; }
+
+        /* ── Disease AI Upload ── */
+        .upload-area {
+          border: 2px dashed var(--border); border-radius: 12px; padding: 40px 20px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          text-align: center; cursor: pointer; transition: all .3s; min-height: 240px;
+          background: rgba(255,255,255,0.02);
+        }
+        .upload-area:hover { border-color: #0ea5e9; background: rgba(14,165,233,0.05); }
+        .image-preview { max-width: 100%; max-height: 300px; border-radius: 8px; object-fit: contain; }
+        .upload-placeholder { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .upload-icon { font-size: 48px; }
+        .upload-placeholder p { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .upload-placeholder small { color: var(--text-secondary); font-size: 13px; }
+        .disease-actions { display: flex; justify-content: flex-end; }
+        .clear-btn {
+          background: transparent; border: 1px solid var(--border); border-radius: 6px;
+          padding: 8px 16px; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 13px;
+        }
+        .clear-btn:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        
+        /* ── Disease Result ── */
+        .disease-details { display: flex; flex-direction: column; gap: 16px; }
+        .disease-name { display: flex; align-items: center; gap: 12px; }
+        .disease-name .icon { font-size: 32px; }
+        .disease-name h3 { margin: 0; font-size: 24px; color: var(--text-primary); }
+        .disease-confidence { display: flex; align-items: center; gap: 12px; }
+        .conf-bar { flex: 1; height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+        .conf-fill { height: 100%; border-radius: 999px; transition: width 1s ease-out; }
+        .disease-confidence span { font-weight: 600; font-size: 14px; min-width: 140px; text-align: right; }
       `}} />
     </div>
   );

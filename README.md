@@ -1,258 +1,97 @@
-# 🌱 IoT Smart Farming System Architecture
+# 🌱 IoT Smart Farming Ecosystem
+
+A comprehensive AIoT platform for smart agriculture. The system integrates IoT devices (YOLO:bit, sensors, actuators), an MQTT message broker (Adafruit IO), a FastAPI backend with Machine Learning capabilities, and a modern React dashboard.
 
 ## 1. Overview
 
-Hệ thống là một nền tảng IoT hoàn chỉnh cho nông nghiệp thông minh, bao gồm:
+The ecosystem provides real-time monitoring of environmental conditions, remote manual and automated control of farm equipment, and advanced AI predictions to optimize farming operations.
 
-* Thiết bị: YOLO:bit + cảm biến
-* Cloud MQTT: Adafruit IO
-* Backend: FastAPI
-* Frontend: React Dashboard
+* **Devices (Edge):** YOLO:bit + DHT20, Soil Moisture, Light sensors, Water Pump, LED
+* **Cloud & Messaging:** Adafruit IO (MQTT Broker)
+* **Backend:** FastAPI (Python) + Websockets + XGBoost/CNN models
+* **Frontend:** React + Vite
 
----
+## 2. Features
 
-## 2. High-level Architecture
+* 📊 **Real-time Dashboard:** Monitor temperature, humidity, soil moisture, and light intensity with live charts.
+* 🎛️ **Control Panel:** Turn on/off water pumps and LEDs manually, or toggle automation modes.
+* 🧠 **Smart Watering Prediction:** Uses an XGBoost Machine Learning model to calculate the optimal amount of water required based on current environmental sensors and plant stage.
+* 🍃 **Plant Disease Detection:** Uses a Convolutional Neural Network (CNN) model (trained on the New Plant Diseases Dataset) to analyze uploaded images and classify 38 different plant conditions.
+* ⚡ **Live Synchronization:** Seamless updates across all web clients via WebSockets connected to the MQTT broker.
 
-```
-YOLO:bit (Sensors & Actuators)
-        ↓ MQTT
-Adafruit IO (Broker + Storage)
-        ↓ REST / MQTT
-Backend (FastAPI)
-        ↓ API
-Frontend (React)
-```
+## 3. High-level Architecture
 
----
-
-## 3. Device Layer (YOLO:bit)
-
-### Sensors:
-
-* Temperature (DHT20)
-* Humidity
-* Soil Moisture
-* Light (Lux)
-
-### Actuators:
-
-* Pump (Pin10 PWM)
-* LED (Pin2 RGB)
-
-### Responsibilities:
-
-* Collect sensor data
-* Publish data to MQTT
-* Receive control commands
-* Execute automation logic (edge)
-
----
-
-## 4. MQTT Layer (Adafruit IO)
-
-### Protocol:
-
-* MQTT (port 1883)
-
-### Feed Design:
-
-| Feed               | Purpose          |
-| ------------------ | ---------------- |
-| BBC_Temperature    | Sensor data      |
-| BBC_Humidity       | Sensor data      |
-| BBC_Soil_Moisture  | Sensor data      |
-| BBC_Lux            | Sensor data      |
-| BBC_LED            | Manual control   |
-| BBC_Pump           | Manual control   |
-| BBC_AutoLED        | Toggle auto mode |
-| BBC_AutoPump       | Toggle auto mode |
-| BBC_Alert_HighTemp | Alert            |
-
-### Topic format:
-
-```
-username/feeds/feed_name
+```text
+[ YOLO:bit (Sensors & Actuators) ]
+            ↓ ↑ MQTT
+[ Adafruit IO (Broker + Storage) ]
+            ↓ ↑ REST / MQTT
+[ Backend (FastAPI & ML Models) ]
+            ↓ ↑ REST API / WebSocket
+[ Frontend (React Dashboard) ]
 ```
 
----
+## 4. How to run the project
 
-## 5. Backend Design (FastAPI)
+### Prerequisites
+* Python 3.8+
+* Node.js 16+ & npm
+* Adafruit IO account (with API Key & Username)
 
-### Purpose:
+### Environment Setup
 
-* Hide AIO Key
-* Aggregate data
-* Provide API for frontend
-* AI/ML processing
+1. **Backend (FastAPI)**
+   ```bash
+   cd src/backend
+   
+   # Create and activate virtual environment
+   python -m venv venv
+   source venv/Scripts/activate  # on Windows
+   # or `source venv/bin/activate` on macOS/Linux
+   
+   # Install dependencies
+   pip install -r requirements.txt
+   
+   # Configure environment variables
+   # Create a .env file and add your credentials:
+   # ADAFRUIT_IO_USERNAME=your_username
+   # ADAFRUIT_IO_KEY=your_aio_key
+   
+   # Start the backend server
+   uvicorn main:app --reload --port 8000
+   ```
 
-### Architecture:
+2. **Frontend (React)**
+   ```bash
+   cd src/frontend
+   
+   # Install dependencies
+   npm install
+   
+   # Start the development server
+   npm run dev
+   ```
 
-```
-FastAPI
- ├── MQTT Client (subscribe)
- ├── REST API
- ├── Database (PostgreSQL)
- └── Business Logic
-```
+3. **Access the application**
+   * Frontend Dashboard: `http://localhost:5173`
+   * Backend API / Swagger Docs: `http://localhost:8000/docs`
 
----
+## 5. AI Capabilities Details
 
-### 5.1 MQTT Consumer
+### Smart Watering Prediction (XGBoost)
+The model analyzes temperature, humidity, soil moisture, light intensity, rainfall, soil type, and crop growth stage to output a precise automated watering recommendation (in ml).
+* Location: `src/backend/AI_modules/Watering_prediction`
 
-* Subscribe to all feeds
-* Store latest values
+### Plant Disease Detection (CNN - Keras)
+Trained utilizing the [Kaggle New Plant Diseases Dataset](https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset). Upload leaf pictures to get realtime classifications and confidence scores for 38 classes indicating health or various types of diseases.
+* Location: `src/backend/AI_modules/Plant_disease_detection`
 
-Example:
+## 6. Future Improvements
 
-```python
-client.subscribe("dadn_nhom11/feeds/#")
-```
-
----
-
-### 5.2 REST API
-
-#### GET sensor data
-
-```
-GET /api/sensors
-```
-
-Response:
-
-```json
-{
-  "temperature": 30,
-  "humidity": 70,
-  "soil": 50,
-  "lux": 40
-}
-```
-
----
-
-#### POST control device
-
-```
-POST /api/control
-```
-
-Body:
-
-```json
-{
-  "device": "pump",
-  "value": 1
-}
-```
+* 📱 Mobile Application (React Native / Flutter)
+* 🚀 Edge AI Inference (Running TinyML directly on YOLO:bit)
+* 🔔 Push Notifications for critical alerts
+* 🌐 Custom independent MQTT Broker (Mosquitto) for enterprise scaling
 
 ---
-
-### 5.3 Database (Optional)
-
-Tables:
-
-* sensor_data
-* device_logs
-* alerts
-
----
-
-## 6. Frontend Design (React)
-
-### Pages:
-
-#### 1. Dashboard
-
-* Realtime charts (temperature, humidity...)
-* Status indicators
-
-#### 2. Control Panel
-
-* Toggle LED
-* Toggle Pump
-* Enable/Disable Auto mode
-
-#### 3. Alerts
-
-* High temperature warning
-
----
-
-### 6.1 Components
-
-* Chart (Chart.js / Recharts)
-* Toggle Switch
-* Status Card
-
----
-
-### 6.2 Data Flow
-
-```
-Frontend → Backend API → Adafruit
-Frontend ← Backend ← MQTT
-```
-
----
-
-### 6.3 Realtime Options
-
-#### Option 1: Polling
-
-* Call API every 5s
-
-#### Option 2: WebSocket (recommended)
-
-* Backend pushes realtime updates
-
----
-
-## 7. Automation Logic
-
-### Watering
-
-* ON: soil < 20% OR 08:00
-* OFF: soil > 70% OR 08:05
-
-### Lighting
-
-* ON: lux < 20 AND time < 22h
-* OFF: otherwise
-
----
-
-## 8. Security Considerations
-
-* Do NOT expose AIO Key on frontend
-* Use backend as proxy
-* Add authentication (JWT)
-
----
-
-## 9. Scaling Ideas
-
-* Replace Adafruit with custom MQTT (Mosquitto)
-* Add AI prediction model
-* Multi-device support
-
----
-
-## 10. Future Improvements
-
-* Mobile app
-* Push notification
-* Edge AI (TinyML)
-
----
-
-# ✅ Conclusion
-
-Hệ thống này là một kiến trúc IoT hoàn chỉnh:
-
-* Edge computing (YOLO:bit)
-* Cloud messaging (MQTT)
-* Backend API
-* Frontend dashboard
-
-Có thể mở rộng thành production system.
+*Built with ❤️ for Modern Agriculture.*

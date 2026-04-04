@@ -28,6 +28,8 @@ env/
 Thumbs.db
 .gemini/
 
-# Large artifacts (optional, keeping joblib and csv if they are small)
+# Large artifacts
 # *.csv
 # *.joblib
+*.keras
+*.h5

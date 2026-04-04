@@ -12,9 +12,12 @@ import pandas as pd
 from contextlib import asynccontextmanager
 from typing import Set
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import io
+from PIL import Image
+import numpy as np
 
 import mqtt_client
 # import automation  # removed – handled on device side
@@ -188,6 +191,96 @@ def predict_water(input: PredictionInput):
 
     result = float(model.predict(df)[0])
     return {"water_amount": round(max(0.0, result), 1)}
+
+# ─── Plant Disease Detection ──────────────────────────────────────────────────
+
+_DISEASE_MODEL = None
+_DISEASE_MODEL_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "AI_modules", "Plant_disease_detection", "model_plant_disease.h5"
+)
+
+_DISEASE_CLASSES = [
+    'Apple___Apple_scab',
+    'Apple___Black_rot',
+    'Apple___Cedar_apple_rust',
+    'Apple___healthy',
+    'Blueberry___healthy',
+    'Cherry_(including_sour)___Powdery_mildew',
+    'Cherry_(including_sour)___healthy',
+    'Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot',
+    'Corn_(maize)___Common_rust_',
+    'Corn_(maize)___Northern_Leaf_Blight',
+    'Corn_(maize)___healthy',
+    'Grape___Black_rot',
+    'Grape___Esca_(Black_Measles)',
+    'Grape___Leaf_blight_(Isariopsis_Leaf_Spot)',
+    'Grape___healthy',
+    'Orange___Haunglongbing_(Citrus_greening)',
+    'Peach___Bacterial_spot',
+    'Peach___healthy',
+    'Pepper,_bell___Bacterial_spot',
+    'Pepper,_bell___healthy',
+    'Potato___Early_blight',
+    'Potato___Late_blight',
+    'Potato___healthy',
+    'Raspberry___healthy',
+    'Soybean___healthy',
+    'Squash___Powdery_mildew',
+    'Strawberry___Leaf_scorch',
+    'Strawberry___healthy',
+    'Tomato___Bacterial_spot',
+    'Tomato___Early_blight',
+    'Tomato___Late_blight',
+    'Tomato___Leaf_Mold',
+    'Tomato___Septoria_leaf_spot',
+    'Tomato___Spider_mites Two-spotted_spider_mite',
+    'Tomato___Target_Spot',
+    'Tomato___Tomato_Yellow_Leaf_Curl_Virus',
+    'Tomato___Tomato_mosaic_virus',
+    'Tomato___healthy'
+]
+
+def _load_disease_model():
+    global _DISEASE_MODEL
+    if _DISEASE_MODEL is None:
+        try:
+            from tensorflow.keras.models import load_model
+            _DISEASE_MODEL = load_model(_DISEASE_MODEL_PATH)
+            logger.info(f"✅ Disease model loaded from {_DISEASE_MODEL_PATH}")
+        except Exception as e:
+            logger.error(f"❌ Failed to load Disease model: {e}")
+            raise HTTPException(status_code=503, detail=f"Model not available: {e}")
+    return _DISEASE_MODEL
+
+
+@app.post("/api/predict-disease")
+async def predict_disease(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        image = image.resize((256, 256))
+        img_array = np.array(image)
+        img_array = np.expand_dims(img_array, axis=0) / 255.0
+        
+        model = _load_disease_model()
+        predictions = model.predict(img_array, verbose=0)
+        
+        predicted_idx = int(np.argmax(predictions, axis=1)[0])
+        confidence = float(np.max(predictions) * 100)
+        
+        disease_name = _DISEASE_CLASSES[predicted_idx].replace('___', ' - ').replace('_', ' ')
+        
+        return {
+            "disease": disease_name,
+            "confidence": confidence
+        }
+    except Exception as e:
+        logger.error(f"Error predicting disease: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/sensors-for-predict")
