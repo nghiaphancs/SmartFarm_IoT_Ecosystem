@@ -30,6 +30,7 @@ Thumbs.db
 
 # Large artifacts
 # *.csv
-# *.joblib
+*.joblib
 *.keras
 *.h5
+*.tflite
