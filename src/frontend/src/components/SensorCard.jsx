@@ -1,4 +1,4 @@
-export default function SensorCard({ type, label, value, unit, icon, isAlert }) {
+export default function SensorCard({ type, label, value, unit, icon, isAlert, alertMsg }) {
   const fmt = value !== null && value !== undefined
     ? parseFloat(value).toFixed(1)
     : '—';
@@ -17,7 +17,9 @@ export default function SensorCard({ type, label, value, unit, icon, isAlert }) 
         <span className="card-unit"> {unit}</span>
       </div>
       <div className="card-trend">
-        {value === null ? 'No data yet' : 'Live data from YOLO:bit'}
+        {value === null 
+          ? 'No data yet' 
+          : (isAlert && alertMsg ? <span style={{color: '#f85149', fontWeight: 'bold'}}>{alertMsg}</span> : 'Live data from YOLO:bit')}
       </div>
     </div>
   );

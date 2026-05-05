@@ -34,3 +34,7 @@ Thumbs.db
 *.keras
 *.h5
 *.tflite
+
+# Project specific
+smartfarm.db
+*.log

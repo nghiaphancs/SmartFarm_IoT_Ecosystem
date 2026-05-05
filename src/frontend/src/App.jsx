@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSmartFarm } from './hooks/useSmartFarm';
 import SensorCard from './components/SensorCard';
 import SensorChart from './components/SensorChart';
 import ControlPanel from './components/ControlPanel';
 
 import WateringPrediction from './pages/WateringPrediction';
+import LoginPage from './pages/Auth/LoginPage';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import SettingsMenu from './components/SettingsMenu';
+import { authApi } from './services/api';
 
 const NAV = [
   { id: 'dashboard', icon: '📊', label: 'Dashboard' },
@@ -46,21 +50,75 @@ function WsBadge({ connected }) {
   );
 }
 
-export default function App() {
+function FarmerShell({ onLogout }) {
   const [page, setPage] = useState('dashboard');
-  const { sensors, devices, alerts, connected, history, control } = useSmartFarm();
+  const { sensors, devices, alerts, connected, history, control, thresholds } = useSmartFarm();
+
+  // ── Smart Alert: Phát hiện sự cố máy bơm ──────────────────────────────────
+  const [pumpIssue, setPumpIssue] = useState(false);
+  const pumpTimerRef = useRef(null);
+  const startMoistureRef = useRef(null);
+
+  useEffect(() => {
+    if (devices.pump === 1) {
+      if (!pumpTimerRef.current) {
+        pumpTimerRef.current = Date.now();
+        startMoistureRef.current = sensors.soil;
+      } else {
+        const elapsedSecs = (Date.now() - pumpTimerRef.current) / 1000;
+        // Nếu bơm chạy > 30s mà độ ẩm không tăng (demo 30s thay vì 5p để dễ thấy)
+        if (elapsedSecs > 30 && sensors.soil <= startMoistureRef.current) {
+          setPumpIssue(true);
+        } else if (sensors.soil > startMoistureRef.current) {
+          setPumpIssue(false); // Đã tăng -> ổn
+        }
+      }
+    } else {
+      pumpTimerRef.current = null;
+      startMoistureRef.current = null;
+      setPumpIssue(false);
+    }
+  }, [devices.pump, sensors.soil]);
+
+  const isDaytime = () => {
+    const hr = new Date().getHours();
+    return hr >= 6 && hr <= 18;
+  };
 
   const renderPage = () => {
     switch (page) {
       case 'dashboard':
         return (
           <div className="dashboard-layout">
+            {pumpIssue && (
+              <div className="smart-alert-banner">
+                ⚠️ <strong>CẢNH BÁO SỰ CỐ:</strong> Máy bơm đang chạy nhưng độ ẩm đất không tăng. 
+                Vui lòng kiểm tra ống dẫn nước hoặc bồn chứa!
+              </div>
+            )}
+            
             <section className="dashboard-top">
               <div className="grid-4">
-                <SensorCard type="temp" label="Temperature" value={sensors.temperature} unit="°C" icon="🌡️" isAlert={sensors.temperature > 35} />
-                <SensorCard type="humidity" label="Air Humidity" value={sensors.humidity} unit="%" icon="💧" />
-                <SensorCard type="soil" label="Soil Moisture" value={sensors.soil} unit="%" icon="🌱" />
-                <SensorCard type="lux" label="Light" value={sensors.lux} unit="lux" icon="☀️" />
+                <SensorCard 
+                  type="temp" label="Temperature" value={sensors.temperature} unit="°C" icon="🌡️" 
+                  isAlert={sensors.temperature > thresholds.threshold_temp || (sensors.temperature !== null && sensors.temperature < 15)} 
+                  alertMsg={sensors.temperature > thresholds.threshold_temp ? `High Temp (>${thresholds.threshold_temp}°C)` : "Low Temp (<15°C)"}
+                />
+                <SensorCard 
+                  type="humidity" label="Air Humidity" value={sensors.humidity} unit="%" icon="💧" 
+                  isAlert={sensors.humidity !== null && sensors.humidity < thresholds.threshold_humidity}
+                  alertMsg={`Dry Air (<${thresholds.threshold_humidity}%)`}
+                />
+                <SensorCard 
+                  type="soil" label="Soil Moisture" value={sensors.soil} unit="%" icon="🌱" 
+                  isAlert={sensors.soil !== null && (sensors.soil < thresholds.threshold_soil || pumpIssue)} 
+                  alertMsg={pumpIssue ? "Pump Malfunction" : `Extremely Dry (<${thresholds.threshold_soil}%)`}
+                />
+                <SensorCard 
+                  type="lux" label="Light" value={sensors.lux} unit="%" icon="☀️" 
+                  isAlert={isDaytime() && sensors.lux !== null && sensors.lux < thresholds.threshold_lux} 
+                  alertMsg="Abnormal Dark Day"
+                />
               </div>
             </section>
 
@@ -69,9 +127,22 @@ export default function App() {
                 <SensorChart dataKey="temperature" data={history.temperature} label="Temp History" unit="°C" />
                 <SensorChart dataKey="humidity" data={history.humidity} label="Humidity History" unit="%" />
                 <SensorChart dataKey="soil" data={history.soil} label="Soil History" unit="%" />
-                <SensorChart dataKey="lux" data={history.lux} label="Light History" unit="lux" />
+                <SensorChart dataKey="lux" data={history.lux} label="Light History" unit="%" />
               </div>
             </section>
+
+            <style dangerouslySetInnerHTML={{ __html: `
+              .smart-alert-banner { 
+                background: #fff5f5; border: 2px solid #f85149; color: #f85149; 
+                padding: 16px; border-radius: 12px; margin-bottom: 24px; 
+                animation: pulseBorder 2s infinite; font-size: 15px;
+              }
+              @keyframes pulseBorder {
+                0% { border-color: #f85149; box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.4); }
+                70% { border-color: #ff9b9b; box-shadow: 0 0 0 10px rgba(248, 81, 73, 0); }
+                100% { border-color: #f85149; box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+              }
+            `}} />
           </div>
         );
 
@@ -102,10 +173,32 @@ export default function App() {
       <main className="main-content">
         <div className="topbar">
           <h2>{titles[page]}</h2>
-          <WsBadge connected={connected} />
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <WsBadge connected={connected} />
+            <SettingsMenu onLogout={onLogout} />
+          </div>
         </div>
         {renderPage()}
       </main>
     </div>
   );
+}
+
+export default function App() {
+  const [role, setRole] = useState(localStorage.getItem('user_role'));
+
+  const handleLogout = () => {
+    authApi.logout();
+    setRole(null);
+  };
+
+  if (!role) {
+    return <LoginPage onLoginSuccess={setRole} />;
+  }
+
+  if (role === 'ADMIN') {
+    return <AdminDashboard onLogout={handleLogout} />;
+  }
+
+  return <FarmerShell onLogout={handleLogout} />;
 }

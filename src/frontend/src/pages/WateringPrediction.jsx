@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { mlApi, aiApi } from '../services/api';
 
 const SOIL_TYPES = [
   { id: 'sandy', label: 'Sandy' },
@@ -30,7 +31,7 @@ const DEFAULT_FORM = {
   temperature: 30,
   air_humidity: 70,
   soil_moisture: 50,
-  light: 25000,
+  light: 25,
   rainfall: 0,
   soil_type: 'loamy',
   growth_stage: 'vegetative',
@@ -93,8 +94,7 @@ function WateringPredictionTab() {
   const handleAutoFill = async () => {
     setAutofilling(true);
     try {
-      const res = await fetch('http://localhost:8000/api/sensors-for-predict');
-      const data = await res.json();
+      const data = await mlApi.getSensorsForPredict();
 
       // Get Location & Fetch 24h rainfall from Open-Meteo
       let autoRainfall = null;
@@ -149,16 +149,7 @@ function WateringPredictionTab() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail ?? 'Prediction failed');
-      }
-      const data = await res.json();
+      const data = await mlApi.predictWatering(form);
       setPrediction(data.water_amount);
     } catch (err) {
       setError(err.message);
@@ -191,8 +182,8 @@ function WateringPredictionTab() {
             <input type="number" name="soil_moisture" value={form.soil_moisture} min={0} max={100} step={0.1} onChange={handleChange} />
           </label>
           <label className="field">
-            <span>Light Intensity (lux)</span>
-            <input type="number" name="light" value={form.light} min={0} max={120000} step={100} onChange={handleChange} onBlur={handleBlur} />
+            <span>Light Level (%)</span>
+            <input type="number" name="light" value={form.light} min={0} max={100} step={1} onChange={handleChange} onBlur={handleBlur} />
           </label>
           <label className="field">
             <span>Rainfall last 24h (mm)</span>
@@ -276,19 +267,8 @@ function PlantDiseaseDetectionTab() {
     setError(null);
     setResult(null);
 
-    const formData = new FormData();
-    formData.append('file', image);
-
     try {
-      const res = await fetch('http://localhost:8000/api/predict-disease', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail ?? 'Prediction failed');
-      }
-      const data = await res.json();
+      const data = await aiApi.predictDisease(image);
       setResult(data);
     } catch (err) {
       setError(err.message);
